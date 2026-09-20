@@ -6,7 +6,7 @@
 
 #include <algorithm>
 #include <ranges>
-
+#include <cstring>
 
 RecordId SystemIndex::addRecordUnlocked(uint32_t name_offset, RecordId parent, uint32_t size, FileFlags flags) {
     const auto id = static_cast<RecordId>(next_record_idx);
