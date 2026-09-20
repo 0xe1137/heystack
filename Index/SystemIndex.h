@@ -21,6 +21,8 @@
  */
 class SystemIndex {
 
+    friend class IndexSerializer;
+
 private:
     mutable std::shared_mutex index_mutex;
 
@@ -77,7 +79,14 @@ public:
     SystemIndex() {
         records.resize(1'000'000);
         string_arena.reserve(100 * 1024 * 1024);
-        records[0] = {0, INVALID_ID, 0, FileFlags::Dir};
+
+        records[0] = {
+            .name_offset = 0,
+            .parent_id = INVALID_ID,
+            .size_bytes = 0,
+            .flags = FileFlags::Dir,
+            .path_hash = 0
+        };
     }
 
     /**

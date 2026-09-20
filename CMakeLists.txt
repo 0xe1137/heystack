@@ -12,4 +12,6 @@ add_executable(heystack main.cpp
         Index/SystemIndex.h
         Scanner/FileScanner.cpp
         Scanner/FileScanner.h
-        Debug/DebugTimer.h)
+        Debug/DebugTimer.h
+        Serialization/IndexSerializer.cpp
+        Serialization/IndexSerializer.h)

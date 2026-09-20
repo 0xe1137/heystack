@@ -13,6 +13,8 @@
  * for the SystemIndex.
  */
 struct FileRecord {
+
+
     /**
      * Offset into the global string byte arena.
      */
@@ -32,6 +34,11 @@ struct FileRecord {
      * File Flags
      */
     FileFlags flags;
+
+    /**
+     * full path hash value
+     */
+    uint64_t path_hash;
 };
 
 

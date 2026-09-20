@@ -22,13 +22,14 @@ RecordId SystemIndex::addRecordUnlocked(
     }
 
     records[id] = {
-        name_offset,
-        parent,
-        size,
-        flags
+        .name_offset = name_offset,
+        .parent_id = parent,
+        .size_bytes = size,
+        .flags = flags,
+        .path_hash = path_hash
     };
 
-    path_hash_to_id.emplace(path_hash, id);
+    path_hash_to_id.emplace(records[id].path_hash, id);
 
     ++next_record_idx;
 
