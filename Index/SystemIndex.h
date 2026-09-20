@@ -30,6 +30,16 @@ private:
     std::vector<FileRecord> records;
 
     /**
+     * @brief Path hash to RecordId secondary index
+     *
+     * FSEvents can sometimes trigger a massive amount of updates,
+     * so this is an O(1) lookup to retrieve the RecordId.
+     *
+     * @note Multimap on the very-rare chance that two paths collide / have the same hash.
+     */
+    std::unordered_multimap<uint64_t, RecordId> path_hash_to_id;
+
+    /**
      * @brief  Index of the next unused record slot.
      *
      * Protected by index_mutex. Mutations occur while holding exclusive ownership
@@ -50,7 +60,7 @@ private:
     /** Internal Helpers
      * Unlocked (lock is acquired prior to invoking them).
      */
-    RecordId addRecordUnlocked(uint32_t name_offset, RecordId parent, uint32_t size, FileFlags flags);
+    RecordId addRecordUnlocked(uint32_t name_offset, uint64_t path_hash, RecordId parent, uint32_t size, FileFlags flags);
     uint32_t internStringUnlocked(std::string_view name);
 
     /** TODO: change to std::optional<std::string> for out-of-bounds case / INVALID_ID. */
@@ -76,12 +86,13 @@ public:
      * Thread-safe. acquires exclusive ownership of index_mutex.
      *
      * @param name The deduplicated filename in the string_arena
+     * @param full_path The full file path.
      * @param parent The RecordId of the parent directory
      * @param size The size of the file in bytes (0 for dir)
      * @param flags  FileFlags bitmask indicating file type & properties.
      * @return RecordId Unique id of the inserted record.
      */
-    RecordId addRecord(std::string_view name, RecordId parent, uint32_t size, FileFlags flags);
+    RecordId addRecord(std::string_view name, std::string_view full_path, RecordId parent, uint32_t size, FileFlags flags);
 
     /**
      * @brief Interns a string into the contiguous string_arena and returns its byte offset.
@@ -143,6 +154,8 @@ public:
      * in the active index.
      */
     RecordId findRecordByPath(std::string_view path) const;
+
+    static uint64_t hashPath(std::string_view path) noexcept;
 };
 
 /**

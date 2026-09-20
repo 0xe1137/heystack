@@ -8,14 +8,28 @@
 #include <ranges>
 #include <cstring>
 
-RecordId SystemIndex::addRecordUnlocked(uint32_t name_offset, RecordId parent, uint32_t size, FileFlags flags) {
+RecordId SystemIndex::addRecordUnlocked(
+    const uint32_t name_offset,
+    const uint64_t path_hash,
+    const RecordId parent,
+    const uint32_t size,
+    const FileFlags flags)
+{
     const auto id = static_cast<RecordId>(next_record_idx);
 
     if (id >= records.size()) {
         records.resize(records.size() * 2);
     }
 
-    records[id] = {name_offset, parent, size, flags};
+    records[id] = {
+        name_offset,
+        parent,
+        size,
+        flags
+    };
+
+    path_hash_to_id.emplace(path_hash, id);
+
     ++next_record_idx;
 
     return id;
@@ -122,21 +136,21 @@ std::vector<RecordId> SystemIndex::search(const std::string_view query, size_t l
 }
 
 RecordId SystemIndex::findRecordByPathUnlocked(const std::string_view path) const {
-    // extract base filename to match
-    const size_t last_slash = path.find_last_of('/');
-    if (last_slash == std::string_view::npos) return INVALID_ID;
+    const uint64_t hash = hashPath(path);
 
-    const std::string_view target_name = path.substr(last_slash + 1);
-    const size_t total = next_record_idx;
+    const auto [begin, end] = path_hash_to_id.equal_range(hash);
 
-    for (size_t i = 1; i < total; ++i) {
-        if (static_cast<bool>(records[i].flags & FileFlags::Deleted)) continue;
+    for (auto it = begin; it != end; ++it) {
+        const RecordId id = it->second;
 
-        // check if base filename matches before reconstructing path
-        if (std::string_view name(&string_arena[records[i].name_offset]); name == target_name) {
-            if (getPathUnlocked(i) == path) {
-                return static_cast<RecordId>(i);
-            }
+        if (static_cast<bool>(
+            records[id].flags & FileFlags::Deleted)) {
+            continue;
+        }
+
+        // Collision Guard
+        if (getPathUnlocked(id) == path) {
+            return id;
         }
     }
 
@@ -144,10 +158,24 @@ RecordId SystemIndex::findRecordByPathUnlocked(const std::string_view path) cons
 }
 
 /** Public API methods */
-RecordId SystemIndex::addRecord(const std::string_view name, const RecordId parent, const uint32_t size, const FileFlags flags) {
+RecordId SystemIndex::addRecord(
+    const std::string_view name,
+    const std::string_view full_path,
+    const RecordId parent,
+    const uint32_t size,
+    const FileFlags flags)
+{
     std::unique_lock lock(index_mutex);
     const uint32_t name_offset = internStringUnlocked(name);
-    return addRecordUnlocked(name_offset, parent, size, flags);
+
+    const uint64_t path_hash = hashPath(full_path);
+
+    return addRecordUnlocked(
+        name_offset,
+        path_hash,
+        parent,
+        size,
+        flags);
 }
 
 uint32_t SystemIndex::internString(const std::string_view name) {
@@ -163,4 +191,8 @@ std::string SystemIndex::getPath(const RecordId id) const {
 RecordId SystemIndex::findRecordByPath(const std::string_view path) const {
     std::shared_lock lock(index_mutex);
     return findRecordByPathUnlocked(path);
+}
+
+uint64_t SystemIndex::hashPath(std::string_view path) noexcept {
+    return std::hash<std::string_view>{}(path);
 }
